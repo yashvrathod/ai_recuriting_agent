@@ -1,7 +1,7 @@
 import { Phone, Video, Coins, AlertCircle } from 'lucide-react'
 import React from 'react'
 import Link from 'next/link'
-import { useUser } from '@/app/provider'
+import { useUser } from '@/app/client-providers'
 import { Button } from '@/components/ui/button'
 
 function CreateOptions() {

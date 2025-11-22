@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
-import { useUser } from '@/app/provider';
+import { useUser } from '@/app/client-providers';
 import { useRouter, usePathname } from 'next/navigation';
 import { Shield } from 'lucide-react';
 import { supabase } from '@/services/supabaseClient';

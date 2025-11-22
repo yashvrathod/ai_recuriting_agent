@@ -19,7 +19,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { useUser } from '@/app/provider';
+import { useUser } from '@/app/client-providers';
 
 function UserManagement() {
   const { user } = useUser();

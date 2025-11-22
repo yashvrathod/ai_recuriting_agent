@@ -8,7 +8,7 @@ import FormContainer from './_components/FormContainer';
 import QuestionList from './_components/QuestionList';
 import { toast } from 'sonner';
 import InterviewLink from './_components/InterviewLink';
-import { useUser } from '@/app/provider';
+import { useUser } from '@/app/client-providers';
 
 function CreateInterview() {
   const router = useRouter();

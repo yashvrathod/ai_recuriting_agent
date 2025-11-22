@@ -1,11 +1,13 @@
 "use client"
-import { UserDetailContext } from '@/context/UserDetailContext';
-import { supabase } from '@/services/supabaseClient';
+
+import { UserDetailContext } from '../context/UserDetailContext';
+import { AuthContextProvider } from '../context/AuthContext';
+import { supabase } from '../services/supabaseClient';
 import React, { useState, useEffect, useContext } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
-function Provider({ children }) {
+function UserDetailProvider({ children }) {
     const [user, setUser] = useState();
     const router = useRouter();
 
@@ -74,12 +76,20 @@ function Provider({ children }) {
 
     return (
         <UserDetailContext.Provider value={{ user, setUser, updateUserCredits }}>
-            <div>{children}</div>
+            {children}
         </UserDetailContext.Provider>
     );
 }
 
-export default Provider;
+export default function ClientProviders({ children }) {
+    return (
+        <AuthContextProvider>
+            <UserDetailProvider>
+                {children}
+            </UserDetailProvider>
+        </AuthContextProvider>
+    );
+}
 
 export const useUser = () => {
     const context = useContext(UserDetailContext);

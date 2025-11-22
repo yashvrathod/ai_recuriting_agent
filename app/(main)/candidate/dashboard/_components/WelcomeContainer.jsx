@@ -1,5 +1,5 @@
 "use client";
-import { useUser } from '@/app/provider';
+import { useUser } from '@/app/client-providers';
 import React, { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { supabase } from '@/services/supabaseClient';

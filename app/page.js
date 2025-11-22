@@ -7,7 +7,7 @@ import { ArrowRight, Brain, Users, Sparkles, Target, BarChart2, Clock, Zap, Chec
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/services/supabaseClient";
-import { useUser } from "@/app/provider";
+import { useUser } from "@/app/client-providers";
 
 export default function Home() {
   const router = useRouter();

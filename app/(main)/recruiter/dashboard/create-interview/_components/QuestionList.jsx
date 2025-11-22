@@ -1,5 +1,5 @@
 "use client";
-import { useUser } from "@/app/provider";
+import { useUser } from "@/app/client-providers";
 import { Button } from "@/components/ui/button";
 import axios from "axios";
 import { Loader2Icon, PlusIcon, Trash2Icon } from "lucide-react";
@@ -17,51 +17,38 @@ function QuestionList({ formData, onCreateLink }) {
   const { user, updateUserCredits } = useUser();
   const hasCalled = useRef(false);
 
-  // Debugging useEffect - logs whenever questionList changes
-  useEffect(() => {
-    console.log("Current questionList state:", questionList);
-  }, [questionList]);
-
   useEffect(() => {
     if (formData && !hasCalled.current) {
-      console.log("Initial formData received:", formData);
+      hasCalled.current = true;
       GenerateQuestionList();
     }
   }, [formData]);
 
   const GenerateQuestionList = async () => {
     setLoading(true);
-    hasCalled.current = true;
     try {
-      console.log("Making API call to generate questions...");
-      const result = await axios.post("/api/ai-model", {
-        ...formData,
-      });
-
-      console.log("API response received:", result.data);
-
+      const result = await axios.post("/api/ai-model", { ...formData });
       const rawContent = result?.data?.content || result?.data?.Content;
 
       if (!rawContent) {
         toast("Invalid response format");
-        console.error('Missing "content" or "Content" field in response');
+        console.error("❌ Missing content in response:", result?.data);
         return;
       }
 
-      const match = rawContent.match(/```json\s*([\s\S]*?)\s*```/);
-
-      if (!match || !match[1]) {
-        toast("Failed to extract question list");
-        console.error("No valid JSON block found in response");
+      let parsedData;
+      try {
+        parsedData = JSON.parse(rawContent.trim());
+      } catch (err) {
+        toast("Invalid AI response format");
+        console.error("❌ Failed to parse JSON:", err, rawContent);
         return;
       }
 
-      const parsedData = JSON.parse(match[1].trim());
-      console.log("Parsed question data:", parsedData);
       setQuestionList(parsedData);
     } catch (e) {
       toast("Server Error, Try Again");
-      console.error("Error generating questions:", e);
+      console.error("❌ Error generating questions:", e);
     } finally {
       setLoading(false);
     }
@@ -73,29 +60,13 @@ function QuestionList({ formData, onCreateLink }) {
       return;
     }
 
-    console.log("Attempting to add new question:", {
-      question: newQuestion,
-      type: newQuestionType
-    });
-
-    setQuestionList(prev => {
-      if (!prev || !prev.interviewQuestions) {
-        console.error("Invalid previous state:", prev);
-        return prev;
-      }
-
-      const newQuestionObj = {
-        question: newQuestion,
-        type: newQuestionType
-      };
-
-      const newState = {
+    setQuestionList((prev) => {
+      if (!prev || !prev.interviewQuestions) return prev;
+      const newQuestionObj = { question: newQuestion, type: newQuestionType };
+      return {
         ...prev,
-        interviewQuestions: [...prev.interviewQuestions, newQuestionObj]
+        interviewQuestions: [...prev.interviewQuestions, newQuestionObj],
       };
-
-      console.log("New state after addition:", newState);
-      return newState;
     });
 
     setNewQuestion("");
@@ -104,26 +75,12 @@ function QuestionList({ formData, onCreateLink }) {
   };
 
   const handleDeleteQuestion = (index) => {
-    console.log("Attempting to delete question at index:", index);
-
-    setQuestionList(prev => {
-      if (!prev || !prev.interviewQuestions || index >= prev.interviewQuestions.length) {
-        console.error("Invalid deletion index or state:", { index, state: prev });
-        return prev;
-      }
-
+    setQuestionList((prev) => {
+      if (!prev || !prev.interviewQuestions) return prev;
       const updatedQuestions = [...prev.interviewQuestions];
       updatedQuestions.splice(index, 1);
-
-      const newState = {
-        ...prev,
-        interviewQuestions: updatedQuestions
-      };
-
-      console.log("New state after deletion:", newState);
-      return newState;
+      return { ...prev, interviewQuestions: updatedQuestions };
     });
-
     toast("Question deleted successfully");
   };
 
@@ -131,11 +88,7 @@ function QuestionList({ formData, onCreateLink }) {
     setSaveLoading(true);
     const interview_id = uuidv4();
 
-    console.log("Final question list being saved:", questionList);
-    console.log("Form data being saved:", formData);
-
     try {
-      // First, deduct credit from user
       const currentCredits = user?.credits || 0;
       if (currentCredits <= 0) {
         toast.error("You don't have enough credits to create an interview");
@@ -145,42 +98,49 @@ function QuestionList({ formData, onCreateLink }) {
 
       const newCredits = currentCredits - 1;
       const creditUpdateResult = await updateUserCredits(newCredits);
-      
+
       if (!creditUpdateResult.success) {
         toast.error("Failed to deduct credit. Please try again.");
         setSaveLoading(false);
         return;
       }
 
-      // Then create the interview
+      // ✅ Make sure questionList is safe JSON
+      const sanitizedQuestionList = JSON.parse(JSON.stringify(questionList));
+
+      // ✅ Insert into Supabase with detailed error handling
       const { data, error } = await supabase
-        .from("Interviews")
+        .from("interviews")
         .insert([
           {
-            ...formData,
-            questionList: questionList,
-            userEmail: user?.email,
-            interview_id: interview_id,
+            interview_id,
+            useremail: user?.email, // ✅ match column name exactly
+            jobposition: formData.jobposition,
+            jobdescription: formData.jobdescription,
+            duration: formData.duration,
+            type: formData.type,
+            questionlist: sanitizedQuestionList, // ✅ lowercase name
           },
         ])
-        .select();
+        .select()
+        .throwOnError();
 
-      console.log("Supabase insert result:", { data, error });
-
-      setSaveLoading(false);
-      onCreateLink(interview_id);
+      console.log("✅ Supabase insert result:", { data, error });
 
       if (error) {
+        console.error("❌ Supabase error:", JSON.stringify(error, null, 2));
         toast("Failed to save interview");
-        console.error("Supabase error:", error);
-        // Revert credit deduction if interview creation failed
-        await updateUserCredits(currentCredits);
+        await updateUserCredits(currentCredits); // revert credit
       } else {
-        toast.success(`Interview saved successfully! Credit deducted. You now have ${newCredits} credits remaining.`);
+        toast.success(
+          `Interview saved successfully! You now have ${newCredits} credits.`
+        );
+        onCreateLink(interview_id);
       }
     } catch (e) {
-      console.error("Error saving interview:", e);
+      console.error("❌ Error saving interview:", e);
       toast("Error saving interview");
+    } finally {
       setSaveLoading(false);
     }
   };
@@ -195,7 +155,8 @@ function QuestionList({ formData, onCreateLink }) {
               Generating Interview Questions
             </h2>
             <p className="text-sm text-gray-600">
-              Our AI is crafting personalized questions based on your job position
+              Our AI is crafting personalized questions based on your job
+              position...
             </p>
           </div>
         </div>
@@ -206,21 +167,21 @@ function QuestionList({ formData, onCreateLink }) {
           <h2 className="text-2xl font-bold mb-6 text-center text-gray-800">
             Generated Questions
           </h2>
-          
-          {/* Credit Info */}
+
           <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-blue-800">Credits Remaining:</span>
-                <span className="text-lg font-bold text-blue-600">{user?.credits || 0}</span>
+                <span className="text-sm font-medium text-blue-800">
+                  Credits Remaining:
+                </span>
+                <span className="text-lg font-bold text-blue-600">
+                  {user?.credits || 0}
+                </span>
               </div>
-              <div className="text-sm text-blue-600">
-                Cost: 1 Credit
-              </div>
+              <div className="text-sm text-blue-600">Cost: 1 Credit</div>
             </div>
           </div>
-          
-          {/* Add Question Form */}
+
           <div className="mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
             <h3 className="font-medium mb-3">Add Custom Question</h3>
             <div className="flex flex-col sm:flex-row gap-3">
@@ -241,17 +202,15 @@ function QuestionList({ formData, onCreateLink }) {
                 <option value="situational">Situational</option>
                 <option value="cultural">Cultural Fit</option>
               </select>
-              <Button 
+              <Button
                 onClick={handleAddQuestion}
                 className="flex items-center gap-1"
               >
-                <PlusIcon className="w-4 h-4" />
-                Add Question
+                <PlusIcon className="w-4 h-4" /> Add Question
               </Button>
             </div>
           </div>
-          
-          {/* Questions List */}
+
           <div className="space-y-4">
             {questionList.interviewQuestions.map((item, index) => (
               <div
@@ -267,19 +226,20 @@ function QuestionList({ formData, onCreateLink }) {
                 <button
                   onClick={() => handleDeleteQuestion(index)}
                   className="text-red-500 hover:text-red-700 p-1 rounded-full hover:bg-red-50"
-                  aria-label="Delete question"
                 >
                   <Trash2Icon className="w-4 h-4" />
                 </button>
               </div>
             ))}
           </div>
-          
+
           <div className="flex justify-end mt-10">
-            <Button 
-              onClick={onFinish} 
+            <Button
+              onClick={onFinish}
               disabled={saveLoading || (user?.credits || 0) <= 0}
-              className={user?.credits <= 0 ? "bg-gray-400 cursor-not-allowed" : ""}
+              className={
+                user?.credits <= 0 ? "bg-gray-400 cursor-not-allowed" : ""
+              }
             >
               {saveLoading ? (
                 <>

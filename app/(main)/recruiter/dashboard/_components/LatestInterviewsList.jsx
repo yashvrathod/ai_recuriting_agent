@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/services/supabaseClient";
-import { useUser } from "@/app/provider";
+import { useUser } from "@/app/client-providers";
 import InterviewCard from "./interviewcard";
 import { toast } from "sonner";
 

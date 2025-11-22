@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import { useUser } from '@/app/provider';
+import { useUser } from '@/app/client-providers';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Coins, Plus, AlertCircle } from 'lucide-react';
